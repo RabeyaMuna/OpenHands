@@ -330,8 +330,9 @@ PLEASE follow the format strictly! PLEASE EMIT ONE AND ONLY ONE FUNCTION CALL PE
 FN_REGEX_PATTERN = r'<function=([^>]+)>\n(.*?)</function>'
 FN_PARAM_REGEX_PATTERN = r'<parameter=([^>]+)>(.*?)</parameter>'
 
-# Add new regex pattern for tool execution results
-TOOL_RESULT_REGEX_PATTERN = r'EXECUTION RESULT of \[(.*?)\]:\n(.*)'
+# Constants for tool execution result parsing
+TOOL_RESULT_PREFIX = 'EXECUTION RESULT of ['
+TOOL_RESULT_SUFFIX = ']:\n'
 
 
 def convert_tool_call_to_string(tool_call: dict) -> str:
@@ -691,23 +692,28 @@ def convert_non_fncall_messages_to_fncall_messages(
 
             # Check for tool execution result pattern
             if isinstance(content, str):
-                tool_result_match = re.search(
-                    TOOL_RESULT_REGEX_PATTERN, content, re.DOTALL
-                )
+                if content.startswith(TOOL_RESULT_PREFIX):
+                    start_idx = len(TOOL_RESULT_PREFIX)
+                    end_idx = content.find(TOOL_RESULT_SUFFIX, start_idx)
+                    if end_idx != -1:
+                        tool_name = content[start_idx:end_idx]
+                        result = content[end_idx + len(TOOL_RESULT_SUFFIX):]
+                        tool_result_match = type('Match', (), {'groups': lambda: (tool_name, result)})()
+                    else:
+                        tool_result_match = None
+                else:
+                    tool_result_match = None
             elif isinstance(content, list):
-                tool_result_match = next(
-                    (
-                        _match
-                        for item in content
-                        if item.get('type') == 'text'
-                        and (
-                            _match := re.search(
-                                TOOL_RESULT_REGEX_PATTERN, item['text'], re.DOTALL
-                            )
-                        )
-                    ),
-                    None,
-                )
+                tool_result_match = None
+                for item in content:
+                    if item.get('type') == 'text' and item['text'].startswith(TOOL_RESULT_PREFIX):
+                        start_idx = len(TOOL_RESULT_PREFIX)
+                        end_idx = item['text'].find(TOOL_RESULT_SUFFIX, start_idx)
+                        if end_idx != -1:
+                            tool_name = item['text'][start_idx:end_idx]
+                            result = item['text'][end_idx + len(TOOL_RESULT_SUFFIX):]
+                            tool_result_match = type('Match', (), {'groups': lambda: (tool_name, result)})()
+                            break
             else:
                 raise FunctionCallConversionError(
                     f'Unexpected content type {type(content)}. Expected str or list. Content: {content}'
