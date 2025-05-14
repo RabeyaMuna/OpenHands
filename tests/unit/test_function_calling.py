@@ -9,6 +9,7 @@ from openhands.agenthub.codeact_agent.function_calling import response_to_action
 from openhands.core.exceptions import FunctionCallValidationError
 from openhands.events.action import (
     BrowseInteractiveAction,
+    BrowseURLAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -170,7 +171,6 @@ def test_browser_missing_code():
     with pytest.raises(FunctionCallValidationError) as exc_info:
         response_to_actions(response)
     assert 'Missing required argument "code"' in str(exc_info.value)
-
 
 def test_invalid_json_arguments():
     """Test handling of invalid JSON in arguments."""
